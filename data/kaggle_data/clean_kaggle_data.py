@@ -33,7 +33,8 @@ def clean_kaggle_data(source_filenames: list, save_filenames: list, cols_to_remo
 if __name__ == "__main__":
     # List of strings to check for in column names
     strings_to_remove = ['id', 'Belfast', 'Birmingham', 'Glasgow', 'London', 'Southampton', 'Portsmouth', 'Birmingham',
-                         'timezone', 'utc_offset', 'longitude', 'latitude', 'population', 'location']
+                         'timezone', 'utc_offset', 'longitude', 'latitude', 'population', 'location', 'elevation',
+                         'generationtime']
 
     df = clean_kaggle_data(source_filenames=["test_data.csv", "train_data.csv"],
                            save_filenames=["prepared_test_data.csv", "prepared_train_data.csv"],
