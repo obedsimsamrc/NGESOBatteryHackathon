@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 desired_width = 320
 pd.set_option('display.width', desired_width)
-pd.set_option('display.max_columns', 20)
+pd.set_option('display.max_columns', 10)
 
 train_instance = PrepareModel(test_or_train='train')
 
@@ -23,13 +23,27 @@ s = setup(train_df, target='battery_output', session_id=123)
 exp = RegressionExperiment()
 
 # init setup on exp
-exp.setup(train_df, target='battery_output', session_id=123, feature_selection=True, remove_outliers=True,
-          normalize=True, feature_selection_method="classic", remove_multicollinearity=True)
+exp.setup(train_df, target='battery_output', session_id=123,
+          # log_experiment=True,
+          feature_selection=True,
+          remove_outliers=True,
+          normalize=True,
+          feature_selection_method="classic",
+          remove_multicollinearity=True)
 
 # compare baseline models
-best = compare_models(sort="MAE")
-
-# plot_model(best, plot='feature', save=True)
-# plt.show()
+# best = compare_models(sort="MAE", include=['huber', 'gbr', 'br', 'en', 'lasso'])
 
 # interpret_model(best)
+# print(best)
+
+# train model
+huber_model = create_model('huber', fold=5, alpha=0.9, epsilon=1.2, return_train_score=True)
+
+# plot_model(huber_model, plot='learning', save=True)
+
+# tune model
+tuned_huber = tune_model(huber_model, n_iter=15, optimize="MAE", choose_better=True)
+
+print(tuned_huber)
+

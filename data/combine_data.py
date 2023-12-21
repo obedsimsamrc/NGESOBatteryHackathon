@@ -8,6 +8,7 @@ from calendar import monthrange
 import os
 import logging
 from typing import Tuple
+import re
 
 logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -22,22 +23,39 @@ class PrepareModel:
                                     f"prepared_{test_or_train}_data.csv").replace("\\", "/")
         frequency_df_path = os.path.join(os.path.dirname(__file__), "system_frequency/ready_for_use",
                                          f"prepared_{test_or_train}_hh_freq.csv").replace("\\", "/")
+        gen_data_path = os.path.join(os.path.dirname(__file__), "B1610_Actual_Generation.csv",
+                                     "B1610_Actual_Generation.csv").replace("\\", "/")
 
         self.base_df = pd.read_csv(base_df_path, index_col=0)
         self.freq_df = pd.read_csv(frequency_df_path)
+        self.gen_df = pd.read_csv(gen_data_path)
+
+        # Removing special json characters that throw errors as heading names when passing into the ML models
+        self.gen_df = self.gen_df.rename(columns=lambda x: re.sub('[^A-Za-z0-9_]+', '', x))
 
         self.base_df["UTC_Settlement_DateTime"] = pd.to_datetime(self.base_df["UTC_Settlement_DateTime"],
                                                                  format="%m/%d/%Y %H:%M")
 
-        self.freq_df["dtm"] = pd.to_datetime(self.freq_df["dtm"], format="%Y-%m-%d %H:%M:%S")
+        try:
+            self.freq_df["dtm"] = pd.to_datetime(self.freq_df["dtm"], format="%Y-%m-%d %H:%M:%S")
+        except KeyError as e:
+            logging.error(f"Check the datetime column heading for the frequency data \n {e}")
+        try:
+            self.gen_df["local_datetime"] = pd.to_datetime(self.gen_df["local_datetime"], format="%d/%m/%Y %H:%M")
+        except KeyError as e:
+            logging.error(f"Check the datetime column heading for the Generation data \n {e}")
 
     def merge_dataframes(self, save_merged_df_as_csv: bool) -> pd.DataFrame:
 
         # Concat the two dataframes on the date
         merged_df = pd.merge(self.base_df, self.freq_df, left_on="UTC_Settlement_DateTime", right_on="dtm", how="left")
 
-        # Drop the dtm datetime col
-        merged_df.drop(["dtm"], axis=1, inplace=True)
+        # Add the generation data to the dataframe
+        merged_df = pd.merge(merged_df, self.gen_df, left_on="UTC_Settlement_DateTime", right_on="local_datetime",
+                             how="left")
+
+        # Drop the extra dtm datetime cols
+        merged_df.drop(["dtm", "local_datetime"], axis=1, inplace=True)
 
         # Save the final merged df
         if save_merged_df_as_csv:
