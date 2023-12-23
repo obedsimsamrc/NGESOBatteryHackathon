@@ -3,7 +3,6 @@ This module cleans the data provided on kaggle and remove unnecessary columns
 """
 import os
 import pandas as pd
-from pprint import pprint
 
 desired_width = 320
 pd.set_option('display.width', desired_width)
