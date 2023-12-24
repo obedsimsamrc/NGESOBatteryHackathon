@@ -76,7 +76,7 @@ class PrepareModel:
                 pd.merge(self.base_df, self.freq_df, left_on="UTC_Settlement_DateTime", right_on="dtm", how="left").
                 merge(self.gen_df, left_on="UTC_Settlement_DateTime", right_on="local_datetime", how="left").
                 merge(self.dx_df, left_on="UTC_Settlement_DateTime", right_on="delivery_start", how="left").
-                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="Date Time", how="right")
+                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="Date Time", how="left")
             )
             # Drop the extra dtm datetime cols
             merged_df.drop(["dtm", "local_datetime", "delivery_start", "Date Time"], axis=1, inplace=True)
@@ -85,7 +85,7 @@ class PrepareModel:
             merged_df = (
                 pd.merge(self.base_df, self.freq_df, left_on="UTC_Settlement_DateTime", right_on="dtm", how="left").
                 merge(self.dx_df, left_on="UTC_Settlement_DateTime", right_on="delivery_start", how="left").
-                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="Date Time", how="right")
+                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="Date Time", how="left")
             )
             # Drop the extra dtm datetime cols
             merged_df.drop(["dtm", "delivery_start", "Date Time"], axis=1, inplace=True)
@@ -94,16 +94,18 @@ class PrepareModel:
             merged_df = (
                 pd.merge(self.base_df, self.freq_df, left_on="UTC_Settlement_DateTime", right_on="dtm", how="left").
                 merge(self.gen_df, left_on="UTC_Settlement_DateTime", right_on="local_datetime", how="left").
-                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="Date Time", how="right")
+                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="Date Time", how="left")
             )
             # Drop the extra dtm datetime cols
             merged_df.drop(["dtm", "local_datetime", "Date Time"], axis=1, inplace=True)
 
+        print(len(merged_df))
         # Fill the nas from the dynamic frequency market prices as zeros
         merged_df.fillna(0, inplace=True)
 
         # Drop rows if datetime column is 0
         merged_df = merged_df.loc[merged_df["UTC_Settlement_DateTime"] != 0]
+        merged_df = merged_df.loc[merged_df["Value"] != 0.000]
 
         # Save the final merged df
         if save_merged_df_as_csv:
