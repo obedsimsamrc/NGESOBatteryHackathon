@@ -22,12 +22,12 @@ def clean_dx_data(filename: str) -> pd.DataFrame:
     dx_df.index = dx_df.index.tz_localize(None)  # Remove timezone information
 
     # Create a dataframe for each service
-    dcl_df = dx_df[dx_df["service"] == "DCL"].resample('1H').ffill()
-    dch_df = dx_df[dx_df["service"] == "DCH"].resample('1H').ffill()
-    dml_df = dx_df[dx_df["service"] == "DML"].resample('1H').ffill()
-    dmh_df = dx_df[dx_df["service"] == "DMH"].resample('1H').ffill()
-    drl_df = dx_df[dx_df["service"] == "DRL"].resample('1H').ffill()
-    drh_df = dx_df[dx_df["service"] == "DRH"].resample('1H').ffill()
+    dcl_df = dx_df[dx_df["service"] == "DCL"].resample('30T').ffill()
+    dch_df = dx_df[dx_df["service"] == "DCH"].resample('30T').ffill()
+    dml_df = dx_df[dx_df["service"] == "DML"].resample('30T').ffill()
+    dmh_df = dx_df[dx_df["service"] == "DMH"].resample('30T').ffill()
+    drl_df = dx_df[dx_df["service"] == "DRL"].resample('30T').ffill()
+    drh_df = dx_df[dx_df["service"] == "DRH"].resample('30T').ffill()
 
     # Merge into a single dataframe
     dx_df = (
@@ -52,3 +52,4 @@ def clean_dx_data(filename: str) -> pd.DataFrame:
 if __name__ == "__main__":
     dx_df = clean_dx_data("dx_results.csv")
 
+    print(dx_df.columns.tolist())

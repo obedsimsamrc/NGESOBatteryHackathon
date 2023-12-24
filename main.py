@@ -12,7 +12,7 @@ train_instance = PrepareModel(test_or_train='train')
 
 merged_train_df = train_instance.merge_dataframes(save_merged_df_as_csv=False,
                                                   include_dyn_market=True,
-                                                  include_gen=True)
+                                                  include_gen=False)
 
 train_df = train_instance.add_additional_datetime_features(df=merged_train_df, datetime_col="UTC_Settlement_DateTime")
 
@@ -22,8 +22,20 @@ train_df = train_instance.add_additional_lagged_features(df=train_df, cols=["tem
                                                                             # "KLGLW1KilgalliochWindFarm"
                                                                             ])
 
-# Create a SoC column
-change_in_soc = train_df["battery_output"] / 35 / 2
+# Remove all battery_output occurrences of 2 std
+# Calculate the mean and standard deviation of the specified column
+mean_value = train_df["battery_output"].mean()
+std_dev = train_df["battery_output"].std()
+
+# Define the threshold for culling
+lower_bound = mean_value - 2 * std_dev
+upper_bound = mean_value + 2 * std_dev
+
+print(lower_bound, upper_bound)
+
+# Keep only the rows within the specified range
+train_df = train_df[(train_df["battery_output"] >= lower_bound) &
+                    (train_df["battery_output"] <= upper_bound)]
 
 s = setup(train_df, target='battery_output', session_id=123)
 
@@ -36,10 +48,10 @@ exp.setup(train_df, target='battery_output',
           # log_experiment=True,
           feature_selection=True,
           remove_outliers=True,
-          outliers_threshold=0.05,
-          # normalize=True,
+          # outliers_threshold=0.1,
+          normalize=True,
           transformation=True,
-          # pca=True,
+          pca=True,
           low_variance_threshold=0.1,
           categorical_features=['year', 'season', 'is_winter', 'month', 'week_of_year', 'day', 'dayofweek', 'hour',
                                 'minute', 'is_wknd', 'is_working_hr', 'is_lunch_hr', 'EFA Block Count', 'EFA HH Count'],
@@ -47,12 +59,13 @@ exp.setup(train_df, target='battery_output',
           remove_multicollinearity=True,
           imputation_type="iterative",
           numeric_iterative_imputer="lightgbm",
+          train_size=0.7,
           )
 
 # compare baseline models
-best = compare_models(sort="MAE",
-                      include=['huber', 'gbr']
-                      )
+# best = compare_models(sort="MAE",
+#                       include=['lightgbm', 'gbr', 'rf']
+#                       )
 
 # interpret_model(best)
 # dashboard(best)
@@ -62,17 +75,37 @@ best = compare_models(sort="MAE",
 # reg1 = get_current_experiment()
 
 # train model
-huber_model = create_model('huber',
-                           fold=5,
-                           alpha=0.01,
-                           epsilon=1.1,
-                           # return_train_score=True
-                           )
+lightgbm_model = create_model('lightgbm', bagging_fraction=0.8, bagging_freq=3, feature_fraction=1.0,
+                              learning_rate=0.005, min_child_samples=96, min_split_gain=0.5,
+                              n_estimators=210, n_jobs=-1, num_leaves=80, random_state=123,
+                              reg_alpha=0.001, reg_lambda=1e-06,
+                              # return_train_score=True,
+                              folds=6
+                              )
 
-plot_model(huber_model, plot='feature', save=True)
-plot_model(huber_model, plot='error', save=True)
+# # tune model
+# tuned_huber = tune_model(huber_model, n_iter=10, optimize="MAE", choose_better=True)
+# tuned_lightgbm = tune_model(lightgbm_model, n_iter=10, optimize="MAE", choose_better=True)
+#
+# # print(tuned_huber)
+#
+# plot_model(tuned_lightgbm, plot='feature', save=True)
+# plot_model(tuned_lightgbm, plot='error', save=True)
 
-# tune model
-tuned_huber = tune_model(huber_model, n_iter=10, optimize="MAE", choose_better=True)
 
-# print(tuned_huber)
+# test_instance = PrepareModel(test_or_train='test')
+#
+# merged_test_df = test_instance.merge_dataframes(save_merged_df_as_csv=False,
+#                                                 include_dyn_market=True,
+#                                                 include_gen=True)
+#
+# test_df = test_instance.add_additional_datetime_features(df=merged_test_df, datetime_col="UTC_Settlement_DateTime")
+#
+# test_df = test_instance.add_additional_lagged_features(df=test_df, cols=["temperature_2mLeeds_weather",
+#                                                                          "windspeed_10mLeeds_weather",
+#                                                                             # "DINO4Dinorwig",
+#                                                                             # "KLGLW1KilgalliochWindFarm"
+#                                                                             ])
+
+# predicted_df = predict_model(lightgbm_model)
+

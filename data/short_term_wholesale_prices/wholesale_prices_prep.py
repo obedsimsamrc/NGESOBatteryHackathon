@@ -7,46 +7,38 @@ pd.set_option('display.width', desired_width)
 pd.set_option('display.max_columns', 20)
 
 
-def clean_wholesale_data() -> pd.DataFrame:
+def clean_wholesale_data(filename, test_or_train: str) -> pd.DataFrame:
 
-    # Get a list of all files in the directory
-    all_files = os.listdir(os.path.dirname(__file__))
-    # Use list comprehension to filter only the CSV files
-    csv_files = [file for file in all_files if file.endswith('.csv')]
+    day_ahead_file_path = os.path.join(os.path.dirname(__file__), filename).replace("\\", "/")
+    day_ahead_df = pd.read_csv(day_ahead_file_path)
 
-    dfs = []
-    for filename in csv_files:
-        dfs.append(pd.read_csv(os.path.join(os.path.dirname(__file__), filename).replace("\\", "/")))
+    day_ahead_df["Date Time"] = pd.to_datetime(day_ahead_df["Date Time"], errors='coerce', format="%d/%m/%Y %H:%M")
 
-    for i in range(len(dfs)):
-        # First split the first datetime column on delimiter
-        dfs[i][["datetime_start", "datetime_end"]] = dfs[i]["MTU (CET/CEST)"].str.split(' - ', expand=True)
-        dfs[i] = dfs[i].drop(["MTU (CET/CEST)", "datetime_end", "BZN|IE(SEM)", "Currency"], axis=1)
-        dfs[i]["datetime_start"] = pd.to_datetime(dfs[i]["datetime_start"], format="%d.%m.%Y %H:%M", errors="coerce")
-        # dfs[i].set_index("datetime_start", drop=True, inplace=True)
+    day_ahead_df.set_index("Date Time", drop=True, inplace=True)
 
-    # Concatenate the DataFrames in the list vertically
-    result_df = pd.concat(dfs, ignore_index=False)
+    day_ahead_df["Value"] = day_ahead_df["Value"].replace('-', np.nan)
+    day_ahead_df["Value"] = day_ahead_df["Value"].astype(float)
+    day_ahead_df["Value"] = day_ahead_df["Value"].interpolate()
 
-    # Resample and interpolate the missing rows
-    result_df = result_df.drop_duplicates(subset="datetime_start")
-    result_df.set_index("datetime_start", drop=True, inplace=True)
-    result_df["Day-ahead Price [EUR/MWh]"] = result_df["Day-ahead Price [EUR/MWh]"].resample("1H").interpolate()
+    # Resample to hh data
+    day_ahead_df = day_ahead_df.resample("30T").ffill()
 
-    # Slice to remove any dates after the end of the test period
-    result_df = result_df.loc[(result_df.index >= pd.Timestamp(day=9, month=8, year=2020)) &
-                              (result_df.index <= pd.Timestamp(day=6, month=6, year=2023))]
+    if test_or_train == "train":
+        day_ahead_df = day_ahead_df[
+            day_ahead_df.index <= pd.Timestamp(day=10, month=11, year=2022, hour=23, minute=30)]
+    else:
+        day_ahead_df = day_ahead_df[
+            (day_ahead_df.index > pd.Timestamp(day=10, month=11, year=2022, hour=23, minute=30)) &
+            (day_ahead_df.index <= pd.Timestamp(day=5, month=6, year=2023, hour=23, minute=30))]
 
-    # Resample to 30 min intervals to match with other data
-    result_df = result_df.resample("30T").ffill()
+    day_ahead_df.to_csv(os.path.join(os.path.dirname(__file__), "ready_for_use",
+                                     f"prepared_{test_or_train}_day_ahead_data.csv").replace("\\", "/"))
 
-    result_df.to_csv(os.path.join(os.path.dirname(__file__), "ready_for_use",
-                                  "prepared_day_ahead_data.csv").replace("\\", "/"))
-
-    return result_df
+    return day_ahead_df
 
 
 if __name__ == "__main__":
 
-    df = clean_wholesale_data()
+    train_df = clean_wholesale_data(filename="nord_pool_day_ahead_prices.csv", test_or_train="train")
+    test_df = clean_wholesale_data(filename="nord_pool_day_ahead_prices.csv", test_or_train="test")
 

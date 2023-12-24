@@ -28,7 +28,7 @@ class PrepareModel:
         dx_data_path = os.path.join(os.path.dirname(__file__), "dx_prices/ready_for_use",
                                     "prepared_dx_data.csv").replace("\\", "/")
         day_ahead_data_path = os.path.join(os.path.dirname(__file__), "short_term_wholesale_prices/ready_for_use",
-                                           "prepared_day_ahead_data.csv").replace("\\", "/")
+                                           f"prepared_{test_or_train}_day_ahead_data.csv").replace("\\", "/")
 
         self.base_df = pd.read_csv(base_df_path, index_col=0)
         self.freq_df = pd.read_csv(frequency_df_path)
@@ -38,13 +38,14 @@ class PrepareModel:
 
         # Removing special json characters that throw errors as heading names when passing into the ML models
         self.gen_df = self.gen_df.rename(columns=lambda x: re.sub('[^A-Za-z0-9_]+', '', x))
-        self.day_ahead_df = self.day_ahead_df.rename(columns=lambda x: re.sub('[^A-Za-z0-9_]+', '', x))
-
-
 
         try:
-            self.base_df["UTC_Settlement_DateTime"] = pd.to_datetime(self.base_df["UTC_Settlement_DateTime"],
-                                                                     format="%m/%d/%Y %H:%M")
+            if test_or_train == "train":
+                self.base_df["UTC_Settlement_DateTime"] = pd.to_datetime(self.base_df["UTC_Settlement_DateTime"],
+                                                                         format="%m/%d/%Y %H:%M")
+            else:
+                self.base_df["UTC_Settlement_DateTime"] = pd.to_datetime(self.base_df["UTC_Settlement_DateTime"],
+                                                                         format="%d/%m/%Y %H:%M")
         except KeyError as e:
             logging.error(f"Check the datetime column heading for the kaggle data \n {e}")
         try:
@@ -61,8 +62,7 @@ class PrepareModel:
         except KeyError as e:
             logging.error(f"Check the datetime column heading for the dynamic frequency market data \n {e}")
         try:
-            self.day_ahead_df["datetime_start"] = pd.to_datetime(self.day_ahead_df["datetime_start"],
-                                                                 format="%Y-%m-%d %H:%M")
+            self.day_ahead_df["Date Time"] = pd.to_datetime(self.day_ahead_df["Date Time"], format="%Y-%m-%d %H:%M:%S")
         except KeyError as e:
             logging.error(f"Check the datetime column heading for the day ahead market price data \n {e}")
 
@@ -76,31 +76,34 @@ class PrepareModel:
                 pd.merge(self.base_df, self.freq_df, left_on="UTC_Settlement_DateTime", right_on="dtm", how="left").
                 merge(self.gen_df, left_on="UTC_Settlement_DateTime", right_on="local_datetime", how="left").
                 merge(self.dx_df, left_on="UTC_Settlement_DateTime", right_on="delivery_start", how="left").
-                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="datetime_start", how="left")
+                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="Date Time", how="right")
             )
             # Drop the extra dtm datetime cols
-            merged_df.drop(["dtm", "local_datetime", "delivery_start", "datetime_start"], axis=1, inplace=True)
+            merged_df.drop(["dtm", "local_datetime", "delivery_start", "Date Time"], axis=1, inplace=True)
 
         elif include_dyn_market and include_freq and not include_gen:
             merged_df = (
                 pd.merge(self.base_df, self.freq_df, left_on="UTC_Settlement_DateTime", right_on="dtm", how="left").
                 merge(self.dx_df, left_on="UTC_Settlement_DateTime", right_on="delivery_start", how="left").
-                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="datetime_start", how="left")
+                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="Date Time", how="right")
             )
             # Drop the extra dtm datetime cols
-            merged_df.drop(["dtm", "delivery_start", "datetime_start"], axis=1, inplace=True)
+            merged_df.drop(["dtm", "delivery_start", "Date Time"], axis=1, inplace=True)
 
         elif include_gen and include_freq and not include_dyn_market:
             merged_df = (
                 pd.merge(self.base_df, self.freq_df, left_on="UTC_Settlement_DateTime", right_on="dtm", how="left").
                 merge(self.gen_df, left_on="UTC_Settlement_DateTime", right_on="local_datetime", how="left").
-                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="datetime_start", how="left")
+                merge(self.day_ahead_df, left_on="UTC_Settlement_DateTime", right_on="Date Time", how="right")
             )
             # Drop the extra dtm datetime cols
-            merged_df.drop(["dtm", "local_datetime", "datetime_start"], axis=1, inplace=True)
+            merged_df.drop(["dtm", "local_datetime", "Date Time"], axis=1, inplace=True)
 
         # Fill the nas from the dynamic frequency market prices as zeros
         merged_df.fillna(0, inplace=True)
+
+        # Drop rows if datetime column is 0
+        merged_df = merged_df.loc[merged_df["UTC_Settlement_DateTime"] != 0]
 
         # Save the final merged df
         if save_merged_df_as_csv:
