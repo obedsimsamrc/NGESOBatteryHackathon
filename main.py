@@ -68,13 +68,6 @@ exp.setup(train_df, target='battery_output',
 #                       include=['lightgbm', 'gbr', 'rf']
 #                       )
 
-# interpret_model(best)
-# dashboard(best)
-# print(best)
-# check ML logs
-# get_logs()
-# reg1 = get_current_experiment()
-
 # train model
 lightgbm_model = create_model('lightgbm', bagging_fraction=0.8, bagging_freq=3, feature_fraction=1.0,
                               learning_rate=0.005, min_child_samples=96, min_split_gain=0.5,
