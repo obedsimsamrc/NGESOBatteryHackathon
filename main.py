@@ -32,8 +32,6 @@ std_dev = train_df["battery_output"].std()
 lower_bound = mean_value - 2 * std_dev
 upper_bound = mean_value + 2 * std_dev
 
-print(lower_bound, upper_bound)
-
 # Keep only the rows within the specified range
 train_df = train_df[(train_df["battery_output"] >= lower_bound) &
                     (train_df["battery_output"] <= upper_bound)]
@@ -78,12 +76,12 @@ lightgbm_model = create_model('lightgbm', bagging_fraction=0.8, bagging_freq=3, 
 
 # tune model
 # tuned_huber = tune_model(huber_model, n_iter=10, optimize="MAE", choose_better=True)
-# tuned_lightgbm = tune_model(lightgbm_model, n_iter=10, optimize="MAE", choose_better=True)
+# tuned_lightgbm = tune_model(lightgbm_model, n_iter=15, optimize="MAE", choose_better=True)
 
 # print(tuned_huber)
 
-# plot_model(tuned_lightgbm, plot='feature', save=True)
-# plot_model(tuned_lightgbm, plot='error', save=True)
+plot_model(lightgbm_model, plot='feature', save=True)
+plot_model(lightgbm_model, plot='error', save=True)
 
 
 test_instance = PrepareModel(test_or_train='test')
@@ -98,10 +96,8 @@ test_df = test_instance.add_additional_datetime_features(df=merged_test_df, date
 test_df = test_instance.add_additional_lagged_features(df=test_df, cols=["temperature_2mLeeds_weather",
                                                                          "windspeed_10mLeeds_weather"])
 
-# merged_test_df.to_csv("check.csv")
-
 predicted_df = predict_model(lightgbm_model, data=test_df)
 
+predicted_df = predicted_df[["UTC_Settlement_DateTime", "prediction_label"]]
 # predicted_df.to_csv(os.path.join(os.path.dirname(__file__), "results", "predicted_results.csv").replace("\\", "/"))
 
-print(len(predicted_df))

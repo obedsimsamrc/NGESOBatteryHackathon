@@ -99,13 +99,18 @@ class PrepareModel:
             # Drop the extra dtm datetime cols
             merged_df.drop(["dtm", "local_datetime", "Date Time"], axis=1, inplace=True)
 
-        print(len(merged_df))
+        print(f"The length of the dataframe after merging is {len(merged_df)}")
         # Fill the nas from the dynamic frequency market prices as zeros
-        merged_df.fillna(0, inplace=True)
+        # merged_df.fillna(0, inplace=True)
 
         # Drop rows if datetime column is 0
-        merged_df = merged_df.loc[merged_df["UTC_Settlement_DateTime"] != 0]
-        merged_df = merged_df.loc[merged_df["Value"] != 0.000]
+        if self.test_or_train == "train":
+            merged_df = merged_df.loc[merged_df["UTC_Settlement_DateTime"] != 0]
+            merged_df = merged_df.loc[merged_df["Value"] != 0.000]
+        # else:
+        #     merged_df = merged_df.loc[merged_df["Value"] != 0.000]
+
+        print(f"The length of the dataframe after removing null entries is {len(merged_df)}")
 
         # Save the final merged df
         if save_merged_df_as_csv:
@@ -147,38 +152,44 @@ class PrepareModel:
         # Drop the rows that now contain na values from shifting
         df.dropna(axis=0, inplace=True)
 
+        print(f"The length of the dataframe after adding the datetime features is {len(df)}")
+
         return df
 
     @staticmethod
     def add_additional_lagged_features(df: pd.DataFrame, cols: list[str]):
 
+        df_copy = df.copy()
+
         for col in cols:
             # Get the temperature 24 hour into the future as another feature
-            df[f'{col}_+24h'] = df[col].shift(periods=-48)
+            df_copy[f'{col}_+24h'] = df[col].shift(periods=-48)
             # Get the temperature 12 hour into the future as another feature
-            df[f'{col}_+12h'] = df[col].shift(periods=-24)
+            df_copy[f'{col}_+12h'] = df[col].shift(periods=-24)
             # Get the temperature 1 hour into the future as another feature
-            df[f'{col}_+1h'] = df[col].shift(periods=-2)
+            df_copy[f'{col}_+1h'] = df[col].shift(periods=-2)
             # Get the temperature 30 mins into the future as another feature
-            df[f'{col}_+30m'] = df[col].shift(periods=-1)
+            df_copy[f'{col}_+30m'] = df[col].shift(periods=-1)
 
             # Get the average temperature over the past day
-            df[f'{col}_daily_avg_-24h'] = df[col].rolling(48, min_periods=48).mean()
+            df_copy[f'{col}_daily_avg_-24h'] = df[col].rolling(48, min_periods=48).mean()
             # Get the average temperature over the next day
-            df[f'{col}_daily_avg_+24h'] = df[col].shift(periods=-48).rolling(48, 48).mean()
+            df_copy[f'{col}_daily_avg_+24h'] = df[col].shift(periods=-48).rolling(48, 48).mean()
             # Get the max temperature over the next day
-            df[f'{col}_daily_max_+24h'] = df[col].shift(periods=-48).rolling(48, 48).max()
+            df_copy[f'{col}_daily_max_+24h'] = df[col].shift(periods=-48).rolling(48, 48).max()
             # Get the min temperature over the next day
-            df[f'{col}_daily_min_+24h'] = df[col].shift(periods=-48).rolling(48, 48).min()
+            df_copy[f'{col}_daily_min_+24h'] = df[col].shift(periods=-48).rolling(48, 48).min()
 
             # Subtract row i from row i - 1
-            df[f'{col}_diff1'] = df[col].diff(periods=1)
+            df_copy[f'{col}_diff1'] = df[col].diff(periods=1)
 
             # Subtract row i from row i - 1 - 2x
-            df[f'{col}_diff2'] = df[col].diff(periods=2)
+            df_copy[f'{col}_diff2'] = df[col].diff(periods=2)
 
         # Drop the rows that now contain na values
-        df.dropna(axis=0, inplace=True)
+        df_copy.dropna(axis=0, inplace=True)
+
+        print(f"The length of the dataframe after adding the lagged features is {len(df)}")
 
         return df
 
