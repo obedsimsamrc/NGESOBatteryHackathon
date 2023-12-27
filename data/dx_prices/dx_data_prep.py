@@ -32,10 +32,10 @@ def clean_dx_data(filename: str) -> pd.DataFrame:
     # Merge into a single dataframe
     dx_df = (
         pd.merge(dcl_df, dch_df, left_index=True, right_index=True, suffixes=("_dcl", "_dch"), how="left")
-        .merge(dml_df.add_suffix("_dml"), left_index=True, right_index=True, how="left")
-        .merge(dmh_df.add_suffix("_dmh"), left_index=True, right_index=True, how="left")
-        .merge(drl_df.add_suffix("_drl"), left_index=True, right_index=True, how="left")
-        .merge(drh_df.add_suffix("_drh"), left_index=True, right_index=True, how="left")
+        # .merge(dml_df.add_suffix("_dml"), left_index=True, right_index=True, how="left")
+        # .merge(dmh_df.add_suffix("_dmh"), left_index=True, right_index=True, how="left")
+        # .merge(drl_df.add_suffix("_drl"), left_index=True, right_index=True, how="left")
+        # .merge(drh_df.add_suffix("_drh"), left_index=True, right_index=True, how="left")
     )
 
     dx_df.drop(dx_df.columns[dx_df.columns.str.contains("service")], axis=1, inplace=True)
@@ -51,5 +51,3 @@ def clean_dx_data(filename: str) -> pd.DataFrame:
 
 if __name__ == "__main__":
     dx_df = clean_dx_data("dx_results.csv")
-
-    print(dx_df.columns.tolist())

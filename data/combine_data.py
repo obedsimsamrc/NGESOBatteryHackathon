@@ -100,15 +100,15 @@ class PrepareModel:
             merged_df.drop(["dtm", "local_datetime", "Date Time"], axis=1, inplace=True)
 
         print(f"The length of the dataframe after merging is {len(merged_df)}")
-        # Fill the nas from the dynamic frequency market prices as zeros
-        # merged_df.fillna(0, inplace=True)
+
+        # Fill the nas from the dynamic frequency market prices and volumes as zeros
+        cols_to_fill = ["cleared_volume_dcl", "cleared_volume_dch", "clearing_price_dcl", "clearing_price_dch"]
+        merged_df[cols_to_fill] = merged_df[cols_to_fill].fillna(0)
 
         # Drop rows if datetime column is 0
         if self.test_or_train == "train":
             merged_df = merged_df.loc[merged_df["UTC_Settlement_DateTime"] != 0]
             merged_df = merged_df.loc[merged_df["Value"] != 0.000]
-        # else:
-        #     merged_df = merged_df.loc[merged_df["Value"] != 0.000]
 
         print(f"The length of the dataframe after removing null entries is {len(merged_df)}")
 
@@ -155,6 +155,37 @@ class PrepareModel:
         print(f"The length of the dataframe after adding the datetime features is {len(df)}")
 
         return df
+
+    @staticmethod
+    def add_ffr_or_dx_service_identifier(df: pd.DataFrame, dx_periods: list[tuple]) -> pd.DataFrame:
+
+        # Periods
+        df_copy = df.copy()
+        df_copy["in_dx"] = 0
+
+        for i in range(len(dx_periods)):
+            condition = (df_copy["UTC_Settlement_DateTime"] >= pd.to_datetime(dx_periods[i][0], dayfirst=True)) & \
+                        (df_copy["UTC_Settlement_DateTime"] <= pd.to_datetime(dx_periods[i][1], dayfirst=True))
+            df_copy["in_dx"] = np.where(condition | (df_copy["in_dx"] == 1), 1, 0)
+
+        return df_copy
+
+    @staticmethod
+    def remove_extreme_battery_outputs(df: pd.DataFrame, no_of_stds=2):
+
+        # Remove all battery_output occurrences of 2 std
+        # Calculate the mean and standard deviation of the specified column
+        mean_value = df["battery_output"].mean()
+        std_dev = df["battery_output"].std()
+
+        # Define the threshold for culling
+        lower_bound = mean_value - no_of_stds * std_dev
+        upper_bound = mean_value + no_of_stds * std_dev
+
+        # Keep only the rows within the specified range
+        sliced_df = df[(df["battery_output"] >= lower_bound) & (df["battery_output"] <= upper_bound)]
+
+        return sliced_df
 
     @staticmethod
     def add_additional_lagged_features(df: pd.DataFrame, cols: list[str]):

@@ -186,7 +186,9 @@ def freq_market_prices(start_date, end_date):
 
 # freq_market_prices_df = freq_market_prices(start_date='2021-12-31T23:00:00', end_date='2022-12-31T19:00:00')
 
-freq_file_path = os.path.join(os.path.dirname(__file__), "test_data_second_freq.csv").replace("\\", "/")
+test_or_train = "test"
+
+freq_file_path = os.path.join(os.path.dirname(__file__), f"{test_or_train}_data_second_freq.csv").replace("\\", "/")
 df = pd.read_csv(freq_file_path, index_col=0)
 # df = pd.read_csv("/battery_model/Data/one_sec_frequency_data.csv")
 df = pd.DataFrame(df)
@@ -250,9 +252,13 @@ df_grouped["EFA HH Count"] = df_grouped["EFA HH Count"].shift(periods=2)
 df_grouped["EFA HH Count"].iloc[0], df_grouped["EFA HH Count"].iloc[1] = 6, 7
 df_grouped["EFA HH Count"] = df_grouped["EFA HH Count"].astype("int")
 
-cols = ["disp_dcl_percent_kWh_per_kW", "disp_dch_percent_kWh_per_kW",
-        "disp_dml_percent_kWh_per_kW", "disp_dmh_percent_kWh_per_kW",
-        "disp_drl_percent_kWh_per_kW", "disp_drh_percent_kWh_per_kW", "EFA Block Count", "Time Count"]
+cols_to_drop = ["f",
+                "disp_dml_percent_kWh_per_kW", "disp_dmh_percent_kWh_per_kW",
+                "disp_drl_percent_kWh_per_kW", "disp_drh_percent_kWh_per_kW", "disp_dml_percent", "disp_dmh_percent",
+                "disp_drl_percent", "disp_drh_percent"]
 
-# freq_half_hourly_file_path = os.path.join(os.path.dirname(__file__), "prepared_test_hh_freq.csv").replace("\\", "/")
-# df_grouped.to_csv(freq_half_hourly_file_path)
+df_grouped.drop(cols_to_drop, axis=1, inplace=True)
+
+freq_half_hourly_file_path = os.path.join(os.path.dirname(__file__),
+                                          f"prepared_{test_or_train}_hh_freq.csv").replace("\\", "/")
+df_grouped.to_csv(freq_half_hourly_file_path)
