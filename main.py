@@ -38,10 +38,10 @@ exp.setup(train_df, target='battery_output',
           # log_experiment=True,
           feature_selection=True,
           remove_outliers=True,
-          # outliers_threshold=0.1,
+          outliers_threshold=0.1,
           normalize=True,
           # transformation=True,
-          # pca=True,
+          pca=True,
           # low_variance_threshold=0.1,
           categorical_features=['year', 'season', 'is_winter', 'month', 'week_of_year', 'day', 'dayofweek', 'hour',
                                 'minute', 'is_wknd', 'is_working_hr', 'is_lunch_hr', 'EFA Block Count', 'EFA HH Count',
@@ -52,6 +52,7 @@ exp.setup(train_df, target='battery_output',
           numeric_iterative_imputer="lightgbm",
           train_size=0.7,
           fold_shuffle=True,
+          profile=True
           )
 
 # compare baseline models
@@ -59,44 +60,45 @@ exp.setup(train_df, target='battery_output',
 #                       include=['lightgbm', 'et', 'rf']
 #                       )
 
-# # train model
-# lightgbm_model = create_model('lightgbm', bagging_fraction=0.8, bagging_freq=3, feature_fraction=1.0,
-#                               learning_rate=0.005, min_child_samples=96, min_split_gain=0.5,
-#                               n_estimators=210, n_jobs=-1, num_leaves=80, random_state=123,
-#                               reg_alpha=0.001, reg_lambda=1e-06,
-#                               # return_train_score=True,
-#                               )
+# train model
+# lightgbm_model = create_model('lightgbm', bagging_fraction=0.7, bagging_freq=7, feature_fraction=0.5,
+#                               min_child_samples=41, min_split_gain=0.3, n_estimators=130,
+#                               n_jobs=-1, num_leaves=50, random_state=123, reg_alpha=3,
+#                               reg_lambda=0.0001, return_train_score=True)
 
-# # tune model
-# # tuned_huber = tune_model(huber_model, n_iter=10, optimize="MAE", choose_better=True)
-# # tuned_lightgbm = tune_model(lightgbm_model, n_iter=15, optimize="MAE", choose_better=True)
-#
-# # print(tuned_huber)
-#
+# tune model
+# tuned_huber = tune_model(huber_model, n_iter=10, optimize="MAE", choose_better=True)
+# tuned_lightgbm = tune_model(lightgbm_model, n_iter=25, optimize="MAE", choose_better=True)
+
+# print(tuned_lightgbm)
+
 # plot_model(best, plot='feature', save=True)
 # plot_model(best, plot='error', save=True)
 
-# test_instance = PrepareModel(test_or_train='test')
+test_instance = PrepareModel(test_or_train='test')
+
+merged_test_df = test_instance.merge_dataframes(include_dyn_market=True,
+                                                include_gen=False)
+
+merged_test_df["UTC_Settlement_DateTime"] = pd.to_datetime(merged_test_df["UTC_Settlement_DateTime"],
+                                                           format="%Y-%m-%d %H:%M:%S")
+
+test_df = test_instance.add_ffr_or_dx_service_identifier(df=merged_test_df, dx_periods=dx_periods)
+
+test_df = test_instance.add_additional_datetime_features(df=test_df, datetime_col="UTC_Settlement_DateTime")
+
+test_df = test_instance.add_additional_lagged_features(df=test_df, cols=["temperature_2mNewcastle upon Tyne_weather",
+                                                                         "windspeed_10mNewcastle upon Tyne_weather",
+                                                                         ])
+
+test_df = test_instance.remove_extreme_battery_outputs(df=test_df, no_of_stds=0, save_df_as_csv=True)
+
 #
-# merged_test_df = test_instance.merge_dataframes(save_merged_df_as_csv=False,
-#                                                 include_dyn_market=True,
-#                                                 include_gen=False)
-# merged_test_df["UTC_Settlement_DateTime"] = pd.to_datetime(merged_test_df["UTC_Settlement_DateTime"],
-#                                                            format="%Y-%m-%d %H:%M:%S")
-#
-# test_df = train_instance.add_ffr_or_dx_service_identifier(df=merged_test_df, dx_periods=dx_periods)
-#
-# test_df = test_instance.add_additional_datetime_features(df=test_df, datetime_col="UTC_Settlement_DateTime")
-#
-# test_df = test_instance.add_additional_lagged_features(df=test_df, cols=["temperature_2mNewcastle upon Tyne_weather",
-#                                                                          "windspeed_10mNewcastle upon Tyne_weather",
-#                                                                          ])
-#
-# predicted_df = predict_model(best, data=test_df)
+# predicted_df = predict_model(lightgbm_model, data=test_df)
 #
 # predicted_df = predicted_df[["prediction_label"]]
 # predicted_df.rename(columns={"prediction_label": "battery_output",
 #                              "index": "id"}, inplace=True)
 # predicted_df.index = range(39457, 39457 + len(predicted_df))
-#
-# predicted_df.to_csv(os.path.join(os.path.dirname(__file__), "results", "predicted_results.csv").replace("\\", "/"))
+
+# predicted_df.to_csv(os.path.join(os.path.dirname(__file__), "results", "predicted_results_2.csv").replace("\\", "/"))

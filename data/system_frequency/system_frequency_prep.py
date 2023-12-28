@@ -186,7 +186,7 @@ def freq_market_prices(start_date, end_date):
 
 # freq_market_prices_df = freq_market_prices(start_date='2021-12-31T23:00:00', end_date='2022-12-31T19:00:00')
 
-test_or_train = "train"
+test_or_train = "test"
 
 freq_file_path = os.path.join(os.path.dirname(__file__), f"{test_or_train}_data_second_freq.csv").replace("\\", "/")
 df = pd.read_csv(freq_file_path, index_col=0)

@@ -168,18 +168,20 @@ class PrepareModel:
 
     def remove_extreme_battery_outputs(self, df: pd.DataFrame, save_df_as_csv: bool, no_of_stds=2):
 
-        # Remove all battery_output occurrences of 2 std
-        # Calculate the mean and standard deviation of the specified column
-        mean_value = df["battery_output"].mean()
-        std_dev = df["battery_output"].std()
+        if self.test_or_train == "train":
+            # Remove all battery_output occurrences of 2 std
+            # Calculate the mean and standard deviation of the specified column
+            mean_value = df["battery_output"].mean()
+            std_dev = df["battery_output"].std()
 
-        # Define the threshold for culling
-        lower_bound = mean_value - no_of_stds * std_dev
-        upper_bound = mean_value + no_of_stds * std_dev
+            # Define the threshold for culling
+            lower_bound = mean_value - no_of_stds * std_dev
+            upper_bound = mean_value + no_of_stds * std_dev
 
-        # Keep only the rows within the specified range
-        sliced_df = df[(df["battery_output"] >= lower_bound) & (df["battery_output"] <= upper_bound)]
-
+            # Keep only the rows within the specified range
+            sliced_df = df[(df["battery_output"] >= lower_bound) & (df["battery_output"] <= upper_bound)]
+        else:
+            sliced_df = df
         # Save the final merged df
         if save_df_as_csv:
             sliced_df.to_csv(os.path.join(os.path.dirname(__file__),
