@@ -66,8 +66,8 @@ class PrepareModel:
         except KeyError as e:
             logging.error(f"Check the datetime column heading for the day ahead market price data \n {e}")
 
-    def merge_dataframes(self, save_merged_df_as_csv: bool, include_freq: bool = True,
-                         include_gen: bool = True, include_dyn_market: bool = True) -> pd.DataFrame:
+    def merge_dataframes(self, include_freq: bool = True, include_gen: bool = True,
+                         include_dyn_market: bool = True) -> pd.DataFrame:
 
         merged_df = None
         # Concat the two dataframes on the date
@@ -110,12 +110,8 @@ class PrepareModel:
             merged_df = merged_df.loc[merged_df["UTC_Settlement_DateTime"] != 0]
             merged_df = merged_df.loc[merged_df["Value"] != 0.000]
 
+        merged_df.drop(["Value"], inplace=True, axis=1)
         print(f"The length of the dataframe after removing null entries is {len(merged_df)}")
-
-        # Save the final merged df
-        if save_merged_df_as_csv:
-            merged_df.to_csv(os.path.join(os.path.dirname(__file__),
-                                          f"prepared_combined_{self.test_or_train}_df.csv").replace("\\", "/"))
 
         return merged_df
 
@@ -170,8 +166,7 @@ class PrepareModel:
 
         return df_copy
 
-    @staticmethod
-    def remove_extreme_battery_outputs(df: pd.DataFrame, no_of_stds=2):
+    def remove_extreme_battery_outputs(self, df: pd.DataFrame, save_df_as_csv: bool, no_of_stds=2):
 
         # Remove all battery_output occurrences of 2 std
         # Calculate the mean and standard deviation of the specified column
@@ -184,6 +179,11 @@ class PrepareModel:
 
         # Keep only the rows within the specified range
         sliced_df = df[(df["battery_output"] >= lower_bound) & (df["battery_output"] <= upper_bound)]
+
+        # Save the final merged df
+        if save_df_as_csv:
+            sliced_df.to_csv(os.path.join(os.path.dirname(__file__),
+                                          f"prepared_combined_{self.test_or_train}_df.csv").replace("\\", "/"))
 
         return sliced_df
 

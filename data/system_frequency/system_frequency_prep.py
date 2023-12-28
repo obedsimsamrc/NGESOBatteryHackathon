@@ -186,7 +186,7 @@ def freq_market_prices(start_date, end_date):
 
 # freq_market_prices_df = freq_market_prices(start_date='2021-12-31T23:00:00', end_date='2022-12-31T19:00:00')
 
-test_or_train = "test"
+test_or_train = "train"
 
 freq_file_path = os.path.join(os.path.dirname(__file__), f"{test_or_train}_data_second_freq.csv").replace("\\", "/")
 df = pd.read_csv(freq_file_path, index_col=0)
@@ -231,15 +231,33 @@ df["disp_drl_percent"] = np.where(df["delta_freq"] <= -0.2, 100,
 df["disp_drh_percent"] = np.where(df["delta_freq"] >= 0.015, -540.541 * df["delta_freq"] + 8.1081,
                                   np.where(df["delta_freq"] >= 0.2, -100, 0))
 
-# Convert the % to fraction and divide by 60*30 to convert to half hours from seconds
+
+# Create a column indicating the dispatch requirements for dynamic regulation low
+df["disp_ffr_percent"] = np.where(df["delta_freq"] <= -0.5, 100,
+                                  np.where(df["delta_freq"] <= -0.015, -206.19 * df["delta_freq"] - 3.0928,
+                                           np.where(df["delta_freq"] <= 0.015, 0,
+                                                    -206.19 * df["delta_freq"] + 3.0928)))
+
+
+# df_sample = df.loc[:10000]
+
+# Convert the % to fraction and divide by 60*30 to convert to half hours from seconds and multiply by 32 for the avg MW contracted
 cols = ["disp_dcl_percent", "disp_dch_percent", "disp_dml_percent", "disp_dmh_percent",
-        "disp_drl_percent", "disp_drh_percent"]
+        "disp_drl_percent", "disp_drh_percent", "disp_ffr_percent"]
 for col in cols:
     df[col + "_kWh_per_kW"] = df[col] / (60 * 30)
 
 # The resulting percentage power capacity values for each second of the year were transformed into
 # energy dispatched in each time step
-df_grouped = df.groupby(pd.Grouper(key='dtm', freq='30T')).sum()
+df_grouped = df.groupby(pd.Grouper(key='dtm', freq='30T')).agg({
+    'f': ['sum', 'max', 'min'],
+    **{col: ['sum', 'mean', 'max', 'min'] for col in df.columns if col not in ['f', 'dtm']}
+})
+df_grouped.columns = ['_'.join(col).strip() for col in df_grouped.columns.values]
+
+df_grouped["disp_ffr_MW"] = df_grouped["disp_ffr_percent_kWh_per_kW_sum"] / 100 * 32
+df_grouped["disp_dcl_MW"] = df_grouped["disp_dcl_percent_kWh_per_kW_sum"] / 100 * 32
+df_grouped["disp_dch_MW"] = df_grouped["disp_dch_percent_kWh_per_kW_sum"] / 100 * 32
 
 # Create a column that indicates the EFA block, day and time within block
 df_grouped["EFA Block Count"] = np.arange(len(df_grouped)) // 8
@@ -252,13 +270,14 @@ df_grouped["EFA HH Count"] = df_grouped["EFA HH Count"].shift(periods=2)
 df_grouped["EFA HH Count"].iloc[0], df_grouped["EFA HH Count"].iloc[1] = 6, 7
 df_grouped["EFA HH Count"] = df_grouped["EFA HH Count"].astype("int")
 
-cols_to_drop = ["f",
-                "disp_dml_percent_kWh_per_kW", "disp_dmh_percent_kWh_per_kW",
-                "disp_drl_percent_kWh_per_kW", "disp_drh_percent_kWh_per_kW", "disp_dml_percent", "disp_dmh_percent",
-                "disp_drl_percent", "disp_drh_percent"]
+cols_to_drop = ["dml", "dmh", "drl", "drh"]
 
-df_grouped.drop(cols_to_drop, axis=1, inplace=True)
+# Filtering and dropping columns containing specified strings
+df_grouped = df_grouped[[col for col in df_grouped.columns if not any(substring in col for substring in cols_to_drop)]]
 
-freq_half_hourly_file_path = os.path.join(os.path.dirname(__file__),
+# Shift all the columns except the datetime down so that it aligns with the battery_output data
+df_grouped = df_grouped.shift(periods=1).dropna()
+
+freq_half_hourly_file_path = os.path.join(os.path.dirname(__file__), "ready_for_use",
                                           f"prepared_{test_or_train}_hh_freq.csv").replace("\\", "/")
 df_grouped.to_csv(freq_half_hourly_file_path)
