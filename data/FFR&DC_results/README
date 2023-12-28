@@ -1,1 +1,5 @@
+Use Combine_FFR_Results.py to create separate csv files for Accepted and Rejected tenders.
 
+I've already added these results and combined with DC results.
+
+Use the Create_Final_Table.py to convert the data to a data series and each service as a column.
