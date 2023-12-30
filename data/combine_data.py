@@ -78,7 +78,7 @@ class PrepareModel:
             logging.error(f"Check the datetime column heading for the day ahead market price data \n {e}")
 
     def merge_dataframes(self, include_freq: bool = True, include_gen: bool = True,
-                         include_dyn_market: bool = True) -> pd.DataFrame:
+                         include_dyn_market: bool = True, include_day_ahead: bool = False) -> pd.DataFrame:
 
         merged_df = None
         # Concat the two dataframes on the date
@@ -116,12 +116,8 @@ class PrepareModel:
         cols_to_fill = ["cleared_volume_dcl", "cleared_volume_dch", "clearing_price_dcl", "clearing_price_dch"]
         merged_df[cols_to_fill] = merged_df[cols_to_fill].fillna(0)
 
-        # Drop rows if datetime column is 0
-        # if self.test_or_train == "train":
-        #     merged_df = merged_df.loc[merged_df["UTC_Settlement_DateTime"] != 0]
-        #     merged_df = merged_df.loc[merged_df["Value"] != 0.000]
-
-        merged_df.drop(["Value"], inplace=True, axis=1)
+        if not include_day_ahead:
+            merged_df.drop(["Value"], inplace=True, axis=1)
         print(f"The length of the dataframe after removing null entries is {len(merged_df)}")
 
         return merged_df
@@ -206,14 +202,6 @@ class PrepareModel:
         df_copy = df.copy()
 
         for col in cols:
-            # # Get the temperature 24 hour into the future as another feature
-            # df_copy[f'{col}_+24h'] = df[col].shift(periods=-48)
-            # # Get the temperature 12 hour into the future as another feature
-            # df_copy[f'{col}_+12h'] = df[col].shift(periods=-24)
-            # # Get the temperature 1 hour into the future as another feature
-            # df_copy[f'{col}_+1h'] = df[col].shift(periods=-2)
-            # # Get the temperature 30 mins into the future as another feature
-            # df_copy[f'{col}_+30m'] = df[col].shift(periods=-1)
             # Get 1 hour before as another feature
             df_copy[f'{col}_-1h'] = df[col].shift(periods=2)
             # Get 30 mins before as another feature
@@ -225,13 +213,18 @@ class PrepareModel:
             df_copy[f'{col}_daily_max_-24h'] = df[col].rolling(48, min_periods=48).max()
             # Get the average temperature over the past day
             df_copy[f'{col}_daily_min_-24h'] = df[col].rolling(48, min_periods=48).min()
+            # Get the average temperature over the past day
+            df_copy[f'{col}_daily_sum_-24h'] = df[col].rolling(48, min_periods=48).sum()
 
-            # # Get the average temperature over the next day
-            # df_copy[f'{col}_daily_avg_+24h'] = df[col].shift(periods=-48).rolling(48, 48).mean()
-            # # Get the max temperature over the next day
-            # df_copy[f'{col}_daily_max_+24h'] = df[col].shift(periods=-48).rolling(48, 48).max()
-            # # Get the min temperature over the next day
-            # df_copy[f'{col}_daily_min_+24h'] = df[col].shift(periods=-48).rolling(48, 48).min()
+            # Get the average over the past 4 hours
+            df_copy[f'{col}_avg_-4h'] = df[col].rolling(8, min_periods=8).mean()
+            # Get the sum over the past 4 hours
+            df_copy[f'{col}_sum_-4h'] = df[col].rolling(8, min_periods=8).sum()
+
+            # Get the average over the past hour
+            df_copy[f'{col}_avg_-12h'] = df[col].rolling(24, min_periods=24).mean()
+            # Get the sum over the past hour
+            df_copy[f'{col}_sum_-12h'] = df[col].rolling(24, min_periods=24).sum()
 
             # Subtract row i from row i - 1
             df_copy[f'{col}_diff1'] = df[col].diff(periods=1)
