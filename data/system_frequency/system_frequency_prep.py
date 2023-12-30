@@ -250,8 +250,7 @@ for col in cols:
 # The resulting percentage power capacity values for each second of the year were transformed into
 # energy dispatched in each time step
 df_grouped = df.groupby(pd.Grouper(key='dtm', freq='30T')).agg({
-    'f': ['sum', 'max', 'min'],
-    **{col: ['sum', 'mean', 'max', 'min'] for col in df.columns if col not in ['f', 'dtm']}
+    **{col: ['sum', 'mean', 'max', 'min', 'std', 'skew'] for col in df.columns if col not in ['dtm']}
 })
 df_grouped.columns = ['_'.join(col).strip() for col in df_grouped.columns.values]
 
@@ -275,8 +274,14 @@ cols_to_drop = ["dml", "dmh", "drl", "drh"]
 # Filtering and dropping columns containing specified strings
 df_grouped = df_grouped[[col for col in df_grouped.columns if not any(substring in col for substring in cols_to_drop)]]
 
-# Shift all the columns except the datetime down so that it aligns with the battery_output data
-df_grouped = df_grouped.shift(periods=1).dropna()
+# Selecting columns to shift (excluding those in 'columns_not_to_shift')
+columns_not_to_shift = ['EFA Block Count', 'EFA HH Count']
+columns_to_shift = [col for col in df_grouped.columns if col not in columns_not_to_shift]
+
+# Shifting only specific columns
+df_grouped[columns_to_shift] = df_grouped[columns_to_shift].shift(periods=1)
+df_grouped.drop(["disp_dch_percent_skew", "disp_dcl_percent_skew", "disp_ffr_percent_skew"], inplace=True, axis=1)
+df_grouped = df_grouped.dropna()
 
 freq_half_hourly_file_path = os.path.join(os.path.dirname(__file__), "ready_for_use",
                                           f"prepared_{test_or_train}_hh_freq.csv").replace("\\", "/")

@@ -14,13 +14,15 @@ logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s -
 
 
 class PrepareModel:
-    def __init__(self, test_or_train: str):
+    def __init__(self, test_or_train: str, concat_x_train_rows: int = None):
 
         self.test_or_train = test_or_train
 
         # Start off with the df provided on Kaggle
         base_df_path = os.path.join(os.path.dirname(__file__), "kaggle_data/ready_for_use",
                                     f"prepared_{test_or_train}_data.csv").replace("\\", "/")
+        train_df_path = os.path.join(os.path.dirname(__file__), "kaggle_data/ready_for_use",
+                                    f"prepared_train_data.csv").replace("\\", "/")
         frequency_df_path = os.path.join(os.path.dirname(__file__), "system_frequency/ready_for_use",
                                          f"prepared_{test_or_train}_hh_freq.csv").replace("\\", "/")
         gen_data_path = os.path.join(os.path.dirname(__file__), "B1610_Actual_Generation.csv",
@@ -31,6 +33,7 @@ class PrepareModel:
                                            f"prepared_{test_or_train}_day_ahead_data.csv").replace("\\", "/")
 
         self.base_df = pd.read_csv(base_df_path, index_col=0)
+        train_df = pd.read_csv(train_df_path, index_col=0)
         self.freq_df = pd.read_csv(frequency_df_path)
         self.gen_df = pd.read_csv(gen_data_path)
         self.dx_df = pd.read_csv(dx_data_path)
@@ -44,8 +47,16 @@ class PrepareModel:
                 self.base_df["UTC_Settlement_DateTime"] = pd.to_datetime(self.base_df["UTC_Settlement_DateTime"],
                                                                          format="%m/%d/%Y %H:%M")
             else:
+                train_df["UTC_Settlement_DateTime"] = pd.to_datetime(train_df["UTC_Settlement_DateTime"],
+                                                                     format="%m/%d/%Y %H:%M")
                 self.base_df["UTC_Settlement_DateTime"] = pd.to_datetime(self.base_df["UTC_Settlement_DateTime"],
                                                                          format="%d/%m/%Y %H:%M")
+                # Add the first x rows to the test_df to factor the shifting of the data
+                train_df = train_df.tail(concat_x_train_rows).drop(["battery_output"], axis=1)
+                logging.info(f"A total of {len(train_df)} rows from the training data have been appended to the top"
+                             f" of the test data")
+                self.base_df = pd.concat([train_df, self.base_df], ignore_index=False)
+
         except KeyError as e:
             logging.error(f"Check the datetime column heading for the kaggle data \n {e}")
         try:
@@ -106,9 +117,9 @@ class PrepareModel:
         merged_df[cols_to_fill] = merged_df[cols_to_fill].fillna(0)
 
         # Drop rows if datetime column is 0
-        if self.test_or_train == "train":
-            merged_df = merged_df.loc[merged_df["UTC_Settlement_DateTime"] != 0]
-            merged_df = merged_df.loc[merged_df["Value"] != 0.000]
+        # if self.test_or_train == "train":
+        #     merged_df = merged_df.loc[merged_df["UTC_Settlement_DateTime"] != 0]
+        #     merged_df = merged_df.loc[merged_df["Value"] != 0.000]
 
         merged_df.drop(["Value"], inplace=True, axis=1)
         print(f"The length of the dataframe after removing null entries is {len(merged_df)}")
@@ -195,23 +206,32 @@ class PrepareModel:
         df_copy = df.copy()
 
         for col in cols:
-            # Get the temperature 24 hour into the future as another feature
-            df_copy[f'{col}_+24h'] = df[col].shift(periods=-48)
-            # Get the temperature 12 hour into the future as another feature
-            df_copy[f'{col}_+12h'] = df[col].shift(periods=-24)
-            # Get the temperature 1 hour into the future as another feature
-            df_copy[f'{col}_+1h'] = df[col].shift(periods=-2)
-            # Get the temperature 30 mins into the future as another feature
-            df_copy[f'{col}_+30m'] = df[col].shift(periods=-1)
+            # # Get the temperature 24 hour into the future as another feature
+            # df_copy[f'{col}_+24h'] = df[col].shift(periods=-48)
+            # # Get the temperature 12 hour into the future as another feature
+            # df_copy[f'{col}_+12h'] = df[col].shift(periods=-24)
+            # # Get the temperature 1 hour into the future as another feature
+            # df_copy[f'{col}_+1h'] = df[col].shift(periods=-2)
+            # # Get the temperature 30 mins into the future as another feature
+            # df_copy[f'{col}_+30m'] = df[col].shift(periods=-1)
+            # Get 1 hour before as another feature
+            df_copy[f'{col}_-1h'] = df[col].shift(periods=2)
+            # Get 30 mins before as another feature
+            df_copy[f'{col}_-30m'] = df[col].shift(periods=1)
 
             # Get the average temperature over the past day
             df_copy[f'{col}_daily_avg_-24h'] = df[col].rolling(48, min_periods=48).mean()
-            # Get the average temperature over the next day
-            df_copy[f'{col}_daily_avg_+24h'] = df[col].shift(periods=-48).rolling(48, 48).mean()
-            # Get the max temperature over the next day
-            df_copy[f'{col}_daily_max_+24h'] = df[col].shift(periods=-48).rolling(48, 48).max()
-            # Get the min temperature over the next day
-            df_copy[f'{col}_daily_min_+24h'] = df[col].shift(periods=-48).rolling(48, 48).min()
+            # Get the average temperature over the past day
+            df_copy[f'{col}_daily_max_-24h'] = df[col].rolling(48, min_periods=48).max()
+            # Get the average temperature over the past day
+            df_copy[f'{col}_daily_min_-24h'] = df[col].rolling(48, min_periods=48).min()
+
+            # # Get the average temperature over the next day
+            # df_copy[f'{col}_daily_avg_+24h'] = df[col].shift(periods=-48).rolling(48, 48).mean()
+            # # Get the max temperature over the next day
+            # df_copy[f'{col}_daily_max_+24h'] = df[col].shift(periods=-48).rolling(48, 48).max()
+            # # Get the min temperature over the next day
+            # df_copy[f'{col}_daily_min_+24h'] = df[col].shift(periods=-48).rolling(48, 48).min()
 
             # Subtract row i from row i - 1
             df_copy[f'{col}_diff1'] = df[col].diff(periods=1)
@@ -222,9 +242,9 @@ class PrepareModel:
         # Drop the rows that now contain na values
         df_copy.dropna(axis=0, inplace=True)
 
-        print(f"The length of the dataframe after adding the lagged features is {len(df)}")
+        print(f"The length of the dataframe after adding the lagged features is {len(df_copy)}")
 
-        return df
+        return df_copy
 
 
 if __name__ == "__main__":
