@@ -83,9 +83,15 @@ def system_freq_api():
         f'2b881e0a-44b4-4957-9cc3-89bf0df6247a&limit={months["June"]}',
     ]
 
+    missing_train_ext_urls = [
+        f'27d4d8b3-0cbe-4cb2-bd83-947f968671a1&limit={months["August"]}',
+        f'cfc880fe-3d3d-4df4-bf4f-9294a4dbc901&limit={months["September"]}',
+        f'3617f1af-4d3c-45d3-a1f6-0d51a9c2167b&limit={months["October"]}',
+    ]
+
     # use concurrent.futures to fetch data concurrently
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        data = [executor.submit(fetch_data, base_url + url) for url in test_ext_urls]
+        data = [executor.submit(fetch_data, base_url + url) for url in missing_train_ext_urls]
     results = [future.result() for future in data]
 
     # This will iterate through the results list and add the dictionaries
@@ -115,9 +121,9 @@ def system_freq_api():
     # Memory usage after conversion
     print("Converted memory usage:", df.memory_usage(deep=True))
 
-    # file_name = "test_data_second_freq.csv"
-    # file_path = os.path.join(os.path.dirname(__file__), file_name).replace("\\", "/")
-    # df.to_csv(file_path)
+    file_name = "missing_training_data_second_freq.csv"
+    file_path = os.path.join(os.path.dirname(__file__), file_name).replace("\\", "/")
+    df.to_csv(file_path)
 
     # end time
     toc = time.time()
@@ -186,7 +192,7 @@ def freq_market_prices(start_date, end_date):
 
 # freq_market_prices_df = freq_market_prices(start_date='2021-12-31T23:00:00', end_date='2022-12-31T19:00:00')
 
-test_or_train = "test"
+test_or_train = "missing_training"
 
 freq_file_path = os.path.join(os.path.dirname(__file__), f"{test_or_train}_data_second_freq.csv").replace("\\", "/")
 df = pd.read_csv(freq_file_path, index_col=0)
@@ -241,7 +247,8 @@ df["disp_ffr_percent"] = np.where(df["delta_freq"] <= -0.5, 100,
 
 # df_sample = df.loc[:10000]
 
-# Convert the % to fraction and divide by 60*30 to convert to half hours from seconds and multiply by 32 for the avg MW contracted
+# Convert the % to fraction and divide by 60*30 to convert to half hours from seconds and
+# multiply by 32 for the avg MW contracted
 cols = ["disp_dcl_percent", "disp_dch_percent", "disp_dml_percent", "disp_dmh_percent",
         "disp_drl_percent", "disp_drh_percent", "disp_ffr_percent"]
 for col in cols:

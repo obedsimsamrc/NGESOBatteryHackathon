@@ -60,7 +60,10 @@ class PrepareModel:
         except KeyError as e:
             logging.error(f"Check the datetime column heading for the kaggle data \n {e}")
         try:
-            self.freq_df["dtm"] = pd.to_datetime(self.freq_df["dtm"], format="%Y-%m-%d %H:%M:%S")
+            if test_or_train == "train":
+                self.freq_df["dtm"] = pd.to_datetime(self.freq_df["dtm"], format="%d/%m/%Y %H:%M")
+            else:
+                self.freq_df["dtm"] = pd.to_datetime(self.freq_df["dtm"], format="%Y-%m-%d %H:%M:%S")
         except KeyError as e:
             logging.error(f"Check the datetime column heading for the frequency data \n {e}")
         try:
